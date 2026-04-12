@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent AI Decision System</title>
+  <style>
+    :root {
+      --bg: #f4f8f8;
+      --panel: #ffffff;
+      --ink: #0e1d2b;
+      --muted: #4c6175;
+      --accent: #0f766e;
+      --accent-2: #155e75;
+      --line: #d7e0e7;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, #d8f3ef 0%, transparent 35%),
+        radial-gradient(circle at 100% 0%, #d8edf8 0%, transparent 40%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1100px, 92vw);
+      margin: 32px auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f766e, #155e75);
+      color: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 12px 28px rgba(10, 22, 35, 0.18);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+      letter-spacing: 0.2px;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.95;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      background: #d1d5db;
+      color: #111827;
+      vertical-align: middle;
+    }
+
+    .badge-llm {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-fallback {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 20px rgba(20, 34, 51, 0.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--muted);
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid #cad6df;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: 2px solid #8cd6cf;
+      border-color: var(--accent);
+    }
+
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.05s ease, opacity 0.2s ease;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+    }
+
+    .ghost {
+      background: #edf3f7;
+      color: #21384d;
+      border: 1px solid #d5e0e8;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--danger);
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f1f2e;
+      color: #b8d6f4;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      min-height: 180px;
+      overflow: auto;
+    }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #5b6e80;
+    }
+
+    .output-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .output-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #17324a;
+    }
+
+    .view-switch {
+      display: inline-flex;
+      background: #eef3f7;
+      border: 1px solid #d8e2ea;
+      border-radius: 10px;
+      padding: 3px;
+      gap: 4px;
+    }
+
+    .view-btn {
+      border: 0;
+      background: transparent;
+      color: #35516b;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .view-btn.active {
+      background: #fff;
+      color: #12344f;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .view-pane.hidden {
+      display: none;
+    }
+
+    .report {
+      display: grid;
+      gap: 12px;
+    }
+
+    .report-block {
+      border: 1px solid #dde6ee;
+      border-radius: 12px;
+      background: #fbfdff;
+      padding: 12px;
+    }
+
+    .report-block h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: #274766;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .report-block p {
+      margin: 0;
+      line-height: 1.55;
+      color: #1d3348;
+      font-size: 0.94rem;
+    }
+
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .agent-card {
+      border: 1px solid #dbe5ed;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .agent-name {
+      display: inline-block;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #0f766e;
+      background: #d9f1ee;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin-bottom: 8px;
+    }
+
+    .agent-text {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: #1e3449;
+    }
+
+    .agent-text + .agent-text {
+      margin-top: 8px;
+    }
+
+    .plan-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #1e3449;
+      font-size: 0.94rem;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .agents-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Multi-Agent AI Decision System</h1>
+      <p>
+        Simulate CEO, Finance, Marketing, and Operations discussion with one click.
+        <span id="sourceBadge" class="badge">SOURCE: UNKNOWN</span>
+      </p>
+    </section>
+
+    <section class="card">
+      <form id="decisionForm">
+        <div class="grid">
+          <div>
+            <label for="company_type">Company Type</label>
+            <input id="company_type" name="company_type" value="E-commerce Startup" required>
+          </div>
+          <div>
+            <label for="budget">Budget</label>
+            <input id="budget" name="budget" value="₹5 lakh" required>
+          </div>
+          <div>
+            <label for="timeline">Timeline</label>
+            <input id="timeline" name="timeline" value="3 months" required>
+          </div>
+          <div>
+            <label for="constraints">Constraints</label>
+            <input id="constraints" name="constraints" value="Small team (5 members), limited marketing budget" required>
+          </div>
+          <div class="full">
+            <label for="core_problem">Core Problem</label>
+            <textarea id="core_problem" name="core_problem" required>Low customer retention and declining repeat purchases</textarea>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="submitBtn">Generate Decision</button>
+          <button type="button" class="ghost" id="sampleBtn">Load Sample</button>
+          <button type="button" class="ghost" id="clearBtn">Clear Output</button>
+        </div>
+        <div id="status" class="status">Ready.</div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="output-head">
+        <div class="output-title">Decision Output</div>
+        <div class="view-switch">
+          <button type="button" id="reportViewBtn" class="view-btn active">Report View</button>
+          <button type="button" id="rawViewBtn" class="view-btn">Raw JSON</button>
+        </div>
+      </div>
+
+      <div id="reportView" class="view-pane">
+        <div id="reportOutput" class="report"></div>
+      </div>
+
+      <div id="rawView" class="view-pane hidden">
+        <pre id="output">{
+  "message": "Your decision response will appear here."
+}</pre>
+      </div>
+      <div class="hint">Endpoint used: <code>POST /decision</code></div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("decisionForm");
+    const output = document.getElementById("output");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submitBtn");
+    const sampleBtn = document.getElementById("sampleBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const sourceBadge = document.getElementById("sourceBadge");
+    const reportViewBtn = document.getElementById("reportViewBtn");
+    const rawViewBtn = document.getElementById("rawViewBtn");
+    const reportView = document.getElementById("reportView");
+    const rawView = document.getElementById("rawView");
+    const reportOutput = document.getElementById("reportOutput");
+
+    const sample = {
+      company_type: "E-commerce Startup",
+      core_problem: "Low customer retention and declining repeat purchases",
+      budget: "₹5 lakh",
+      timeline: "3 months",
+      constraints: "Small team (5 members), limited marketing budget"
+    };
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle("error", isError);
+    }
+
+    function setSourceBadge(source) {
+      const value = (source || "unknown").toLowerCase();
+      sourceBadge.classList.remove("badge-llm", "badge-fallback", "badge-error");
+
+      if (value === "llm") {
+        sourceBadge.textContent = "SOURCE: LLM";
+        sourceBadge.classList.add("badge-llm");
+        return;
+      }
+      if (value === "fallback") {
+        sourceBadge.textContent = "SOURCE: FALLBACK";
+        sourceBadge.classList.add("badge-fallback");
+        return;
+      }
+      if (value === "pending") {
+        sourceBadge.textContent = "SOURCE: CHECKING...";
+        return;
+      }
+
+      sourceBadge.textContent = "SOURCE: ERROR";
+      sourceBadge.classList.add("badge-error");
+    }
+
+    function setFormData(data) {
+      Object.entries(data).forEach(([key, value]) => {
+        const field = form.elements.namedItem(key);
+        if (field) field.value = value;
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setOutputView(view) {
+      const reportActive = view === "report";
+      reportView.classList.toggle("hidden", !reportActive);
+      rawView.classList.toggle("hidden", reportActive);
+      reportViewBtn.classList.toggle("active", reportActive);
+      rawViewBtn.classList.toggle("active", !reportActive);
+    }
+
+    function renderReport(data) {
+      const agents = Array.isArray(data.agents_discussion) ? data.agents_discussion : [];
+      const plan = Array.isArray(data.execution_plan) ? data.execution_plan : [];
+      const agentCards = agents.map((agent) => `
+        <article class="agent-card">
+          <div class="agent-name">${escapeHtml(agent.agent)}</div>
+          <p class="agent-text"><strong>Thoughts:</strong> ${escapeHtml(agent.thoughts)}</p>
+          <p class="agent-text"><strong>Decision:</strong> ${escapeHtml(agent.decision)}</p>
+        </article>
+      `).join("");
+
+      const planItems = plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
+
+      reportOutput.innerHTML = `
+        <section class="report-block">
+          <h3>Problem</h3>
+          <p>${escapeHtml(data.problem)}</p>
+        </section>
+        <section class="report-block">
+          <h3>Agents Discussion</h3>
+          <div class="agents-grid">${agentCards || "<p>No agent output available.</p>"}</div>
+        </section>
+        <section class="report-block">
+          <h3>Conflicts Identified</h3>
+          <p>${escapeHtml(data.conflicts_identified)}</p>
+        </section>
+        <section class="report-block">
+          <h3>Resolution</h3>
+          <p>${escapeHtml(data.resolution)}</p>
+        </section>
+        <section class="report-block">
+          <h3>Final Decision</h3>
+          <p>${escapeHtml(data.final_decision)}</p>
+        </section>
+        <section class="report-block">
+          <h3>Execution Plan</h3>
+          <ol class="plan-list">${planItems || "<li>No execution steps returned.</li>"}</ol>
+        </section>
+      `;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      submitBtn.disabled = true;
+      setStatus("Generating multi-agent decision...");
+      setSourceBadge("pending");
+
+      const payload = {
+        company_type: form.company_type.value.trim(),
+        core_problem: form.core_problem.value.trim(),
+        budget: form.budget.value.trim(),
+        timeline: form.timeline.value.trim(),
+        constraints: form.constraints.value.trim()
+      };
+
+      try {
+        const response = await fetch("/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        const source = response.headers.get("X-Decision-Source");
+        const fallbackReason = response.headers.get("X-Decision-Fallback-Reason");
+        if (!response.ok) {
+          output.textContent = JSON.stringify(data, null, 2);
+          reportOutput.innerHTML = "";
+          setStatus(data.detail || "Request failed. Check input and try again.", true);
+          setSourceBadge("error");
+          return;
+        }
+
+        output.textContent = JSON.stringify(data, null, 2);
+        renderReport(data);
+        setOutputView("report");
+        setSourceBadge(source || "error");
+        if ((source || "").toLowerCase() === "fallback" && fallbackReason) {
+          setStatus("Fallback used: " + fallbackReason, true);
+        } else {
+          setStatus("Decision generated successfully.");
+        }
+      } catch (err) {
+        output.textContent = JSON.stringify({ error: String(err) }, null, 2);
+        setStatus("Network error: ensure backend server is running.", true);
+        setSourceBadge("error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    sampleBtn.addEventListener("click", () => {
+      setFormData(sample);
+      setStatus("Sample data loaded.");
+    });
+
+    clearBtn.addEventListener("click", () => {
+      output.textContent = JSON.stringify({ message: "Output cleared." }, null, 2);
+      reportOutput.innerHTML = "";
+      setStatus("Output cleared.");
+      setSourceBadge("unknown");
+    });
+
+    reportViewBtn.addEventListener("click", () => setOutputView("report"));
+    rawViewBtn.addEventListener("click", () => setOutputView("raw"));
+  </script>
+</body>
+</html>
