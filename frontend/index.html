@@ -455,6 +455,94 @@
         .replaceAll("'", "&#039;");
     }
 
+    function normalizeDisplayText(value) {
+      if (value === null || value === undefined) return "";
+      if (typeof value === "string") {
+        const text = value.trim();
+        if (text.startsWith("{") || text.startsWith("[")) {
+          const parsedText = parseStructuredText(text);
+          if (parsedText) return normalizeDisplayText(parsedText);
+          return stripStructuredNoise(text);
+        }
+        return text.replace(/\s+/g, " ");
+      }
+      if (Array.isArray(value)) {
+        return value.map(normalizeDisplayText).filter(Boolean).join("; ");
+      }
+      if (typeof value === "object") {
+        const preferredKeys = [
+          "summary",
+          "recommendation",
+          "decision",
+          "final_decision",
+          "resolution",
+          "action",
+          "rationale"
+        ];
+        const parts = preferredKeys
+          .filter((key) => value[key])
+          .map((key) => `${titleCase(key)}: ${normalizeDisplayText(value[key])}`);
+
+        if (parts.length) return parts.join(" ");
+
+        return Object.entries(value)
+          .map(([key, item]) => `${titleCase(key)}: ${normalizeDisplayText(item)}`)
+          .join(" ");
+      }
+      return String(value).replace(/\s+/g, " ");
+    }
+
+    function titleCase(value) {
+      return String(value)
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function parseStructuredText(text) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    function stripStructuredNoise(text) {
+      return text
+        .replace(/[{}[\]"]/g, " ")
+        .replaceAll("'", "")
+        .replace(/\b(problem|company_type|core_problem|budget|timeline|constraints|agent|thoughts|decision)\s*:/gi, "")
+        .replace(/\s*,\s*/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function renderFinalDecision(value) {
+      let parsed = value;
+      if (typeof value === "string") {
+        const text = value.trim();
+        if (text.startsWith("{") || text.startsWith("[")) {
+          parsed = parseStructuredText(text) || value;
+        }
+      }
+
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return `<p>${escapeHtml(normalizeDisplayText(parsed))}</p>`;
+      }
+
+      const summary = parsed.summary || parsed.final_decision || parsed.decision || parsed.recommendation;
+      const rationale = parsed.rationale || parsed.reason || parsed.why;
+      const budget = parsed.budget_allocation || parsed.budget;
+      const actions = parsed.actions || parsed.recommended_actions || parsed.next_steps;
+      const sections = [];
+
+      if (summary) sections.push(`<p>${escapeHtml(normalizeDisplayText(summary))}</p>`);
+      if (rationale) sections.push(`<p><strong>Reason:</strong> ${escapeHtml(normalizeDisplayText(rationale))}</p>`);
+      if (budget) sections.push(`<p><strong>Budget focus:</strong> ${escapeHtml(normalizeDisplayText(budget))}</p>`);
+      if (actions) sections.push(`<p><strong>Recommended actions:</strong> ${escapeHtml(normalizeDisplayText(actions))}</p>`);
+
+      return sections.join("") || `<p>${escapeHtml(normalizeDisplayText(parsed))}</p>`;
+    }
+
     function setOutputView(view) {
       const reportActive = view === "report";
       reportView.classList.toggle("hidden", !reportActive);
@@ -468,13 +556,13 @@
       const plan = Array.isArray(data.execution_plan) ? data.execution_plan : [];
       const agentCards = agents.map((agent) => `
         <article class="agent-card">
-          <div class="agent-name">${escapeHtml(agent.agent)}</div>
-          <p class="agent-text"><strong>Thoughts:</strong> ${escapeHtml(agent.thoughts)}</p>
-          <p class="agent-text"><strong>Decision:</strong> ${escapeHtml(agent.decision)}</p>
+          <div class="agent-name">${escapeHtml(normalizeDisplayText(agent.agent))}</div>
+          <p class="agent-text"><strong>Thoughts:</strong> ${escapeHtml(normalizeDisplayText(agent.thoughts))}</p>
+          <p class="agent-text"><strong>Decision:</strong> ${escapeHtml(normalizeDisplayText(agent.decision))}</p>
         </article>
       `).join("");
 
-      const planItems = plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
+      const planItems = plan.map((step) => `<li>${escapeHtml(normalizeDisplayText(step))}</li>`).join("");
 
       reportOutput.innerHTML = `
         <section class="report-block">
@@ -495,7 +583,7 @@
         </section>
         <section class="report-block">
           <h3>Final Decision</h3>
-          <p>${escapeHtml(data.final_decision)}</p>
+          ${renderFinalDecision(data.final_decision)}
         </section>
         <section class="report-block">
           <h3>Execution Plan</h3>

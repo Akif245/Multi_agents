@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 import json
 import os
@@ -123,19 +124,19 @@ def _chat_completion(payload: Dict, headers: Dict[str, str]) -> Dict:
 
 def _coerce_decision_output(parsed: Dict, data: ProblemInput) -> Dict:
     # Make parser resilient across weaker/free models that may miss fields or vary casing.
-    problem = str(parsed.get("problem") or _problem_statement(data))
-    conflicts = str(parsed.get("conflicts_identified") or parsed.get("conflicts") or "No major strategic conflicts detected.")
-    resolution = str(parsed.get("resolution") or "Proceed with aligned strategy and weekly metric reviews.")
-    final_decision = str(parsed.get("final_decision") or parsed.get("decision") or "Proceed with a practical phased plan.")
+    problem = _clean_display_text(parsed.get("problem") or _problem_statement(data))
+    conflicts = _clean_display_text(parsed.get("conflicts_identified") or parsed.get("conflicts") or "No major strategic conflicts detected.")
+    resolution = _clean_display_text(parsed.get("resolution") or "Proceed with aligned strategy and weekly metric reviews.")
+    final_decision = _format_final_decision(parsed.get("final_decision") or parsed.get("decision") or "Proceed with a practical phased plan.")
 
     raw_agents = parsed.get("agents_discussion") or parsed.get("agent_discussion") or []
     agents_discussion: List[Dict[str, str]] = []
     if isinstance(raw_agents, list):
         for item in raw_agents:
             if isinstance(item, dict):
-                agent_name = str(item.get("agent") or "Agent")
-                thoughts = str(item.get("thoughts") or item.get("analysis") or "")
-                decision = str(item.get("decision") or item.get("recommendation") or "")
+                agent_name = _clean_display_text(item.get("agent") or "Agent")
+                thoughts = _clean_display_text(item.get("thoughts") or item.get("analysis") or "")
+                decision = _clean_display_text(item.get("decision") or item.get("recommendation") or "")
                 agents_discussion.append({"agent": agent_name, "thoughts": thoughts, "decision": decision})
     if not agents_discussion:
         agents_discussion = [
@@ -150,7 +151,7 @@ def _coerce_decision_output(parsed: Dict, data: ProblemInput) -> Dict:
         exec_plan = [line.strip("- ").strip() for line in exec_plan.splitlines() if line.strip()]
     if not isinstance(exec_plan, list):
         exec_plan = []
-    exec_plan = [str(step) for step in exec_plan if str(step).strip()]
+    exec_plan = [_clean_display_text(step) for step in exec_plan if _clean_display_text(step)]
     if not exec_plan:
         exec_plan = [
             "Week 1: Define baseline KPIs and customer segments.",
@@ -167,6 +168,87 @@ def _coerce_decision_output(parsed: Dict, data: ProblemInput) -> Dict:
         "final_decision": final_decision,
         "execution_plan": exec_plan,
     }
+
+
+def _clean_display_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("{") or text.startswith("["):
+            parsed_text = _parse_structured_text(text)
+            if parsed_text is not None:
+                return _clean_display_text(parsed_text)
+            return " ".join(text.split())
+        return " ".join(text.split())
+    if isinstance(value, list):
+        return "; ".join(_clean_display_text(item) for item in value if _clean_display_text(item))
+    if isinstance(value, dict):
+        priority_keys = [
+            "summary",
+            "recommendation",
+            "decision",
+            "final_decision",
+            "resolution",
+            "action",
+            "rationale",
+        ]
+        parts: List[str] = []
+        for key in priority_keys:
+            if value.get(key):
+                label = key.replace("_", " ").title()
+                parts.append(f"{label}: {_clean_display_text(value[key])}")
+        if parts:
+            return " ".join(parts)
+        return " ".join(f"{key.replace('_', ' ').title()}: {_clean_display_text(item)}" for key, item in value.items())
+    return " ".join(str(value).split())
+
+
+def _format_final_decision(value) -> str:
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("{") or text.startswith("["):
+            parsed_text = _parse_structured_text(text)
+            if parsed_text is not None:
+                return _format_final_decision(parsed_text)
+            return _clean_display_text(text)
+        return _clean_display_text(text)
+    if isinstance(value, list):
+        return " ".join(_clean_display_text(item) for item in value if _clean_display_text(item))
+    if isinstance(value, dict):
+        lines: List[str] = []
+        summary = value.get("summary") or value.get("final_decision") or value.get("decision") or value.get("recommendation")
+        rationale = value.get("rationale") or value.get("reason") or value.get("why")
+        actions = value.get("actions") or value.get("recommended_actions") or value.get("next_steps")
+        budget = value.get("budget_allocation") or value.get("budget")
+
+        if summary:
+            lines.append(_clean_display_text(summary))
+        if rationale:
+            lines.append(f"Reason: {_clean_display_text(rationale)}")
+        if budget:
+            lines.append(f"Budget focus: {_clean_display_text(budget)}")
+        if actions:
+            lines.append(f"Recommended actions: {_clean_display_text(actions)}")
+
+        return " ".join(lines) if lines else _clean_display_text(value)
+    return _clean_display_text(value)
+
+
+def _parse_structured_text(text: str):
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+
+    try:
+        parsed = ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return None
+
+    if isinstance(parsed, (dict, list, str, int, float, bool)) or parsed is None:
+        return parsed
+    return None
 
 
 def _decision_from_unstructured_text(text: str, data: ProblemInput) -> Dict:
